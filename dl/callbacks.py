@@ -134,14 +134,15 @@ class Logger(Callback):
         logger.addHandler(ch)
         return logger
 
-    def _get_metrics_string(self, metrics):
+    @staticmethod
+    def _get_metrics_string(metrics):
         return " | ".join(
             "{}: {:.5f}".format(k, v) for k, v in metrics.items())
 
 
-class GroupTensorboardLogger(Callback):
+class TensorboardLogger(Callback):
     """
-    Another tensorboard logger. Uses tags to group same metrics, but for
+    Tensorboard logger. Uses tags to group same metrics, but for
     train and validation. Can log per-batch or per-epoch values.
     You can maintain two independent metric sets by creating two instances
     """
@@ -152,7 +153,7 @@ class GroupTensorboardLogger(Callback):
         metric_names: List[str] = None,
         log_on_batch_end=True,
         log_on_epoch_end=True,
-        split_by_loader=False
+        split_by_loader=True
     ):
         """
         :param logdir: directory where logs will be created
@@ -161,8 +162,8 @@ class GroupTensorboardLogger(Callback):
         :param log_on_batch_end: Logs per-batch value of metrics,
             prepends 'batch_' prefix to their names.
         :param log_on_epoch_end: Logs per-epoch metrics if set True
-
-        :param split_by_loader: Uses separate writer in separate subdir per loader
+        :param split_by_loader:
+            Uses separate writer in separate subdir per loader
             (will be visible as two different runs in TB)
         """
 
@@ -179,23 +180,24 @@ class GroupTensorboardLogger(Callback):
 
     @property
     def _writer_suffix(self):
-        suffix = '_'
+        suffix = "_"
 
         if self.log_on_batch_end:
-            suffix += 'b'
+            suffix += "batch"
 
         if self.log_on_epoch_end:
-            suffix += 'e'
+            suffix += "epoch"
         return suffix
 
     def _get_writer(self, mode):
         if not self.split_by_loader:
-            mode = ''
+            mode = ""
 
         if mode not in self.writers:
+            # suffix prevents conflict between instances
             self.writers[mode] = SummaryWriter(
                 os.path.join(self.logdir, mode),
-                filename_suffix=self._writer_suffix  # Prevents conflict between instances
+                filename_suffix=self._writer_suffix
             )
 
         return self.writers[mode]
@@ -205,7 +207,7 @@ class GroupTensorboardLogger(Callback):
         metrics: Dict[str, float],
         mode: str,
         step: int,
-        prefix=''
+        prefix=""
     ):
         if self.metrics_to_log is None:
             self.metrics_to_log = list(metrics.keys())
@@ -220,13 +222,13 @@ class GroupTensorboardLogger(Callback):
             mode = state.loader_mode
             self._log_metrics(state.epoch_metrics[mode], mode, state.epoch)
 
-        for wrt in self.writers.values():
-            wrt.flush()
+        # for wrt in self.writers.values():
+        #     wrt.file_writer.flush()
 
     def on_batch_end(self, state: RunnerState):
         if self.log_on_batch_end:
             mode = state.loader_mode
-            self._log_metrics(state.batch_metrics, mode, state.step, 'batch_')
+            self._log_metrics(state.batch_metrics, mode, state.step, "batch_")
 
 
 class CheckpointCallback(Callback):
@@ -317,7 +319,7 @@ class CheckpointCallback(Callback):
             scheduler=state._scheduler,
             valid_metrics=dict(state.valid_metrics),  # @TODO: save defaultdict
             epoch_metrics=dict(state.epoch_metrics),  # @TODO: save defaultdict
-            best_metrics=dict(state.best_metrics),  # @TODO: save defaultdict
+            best_metrics=dict(state.best_metrics),    # @TODO: save defaultdict
             stage=state.stage,
             epoch=state.epoch)
         self.save_checkpoint(
