@@ -49,7 +49,7 @@ def main(args, unknown_args):
 
     datasource = modules["data"].DataSource()
     data_params = config.get("data_params", {})
-    loaders = datasource.prepare_loaders(args, **data_params)
+    loaders = datasource.prepare_loaders(args=args, **data_params)
     model = modules["model"].prepare_model(config)
 
     runner = modules["model"].ModelRunner(model=model)
