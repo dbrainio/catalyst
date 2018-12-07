@@ -27,7 +27,7 @@ class AbstractModelRunner:
             criterion: Dict[str, nn.Module] = None,
             optimizer: Dict[str, optim.Optimizer] = None,
             scheduler: Dict[str, optim.lr_scheduler._LRScheduler] = None,
-            debug: bool = True):
+            debug: bool = False):
         """
 
         :param model: nn.Module instance, your model

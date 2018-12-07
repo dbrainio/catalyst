@@ -142,93 +142,122 @@ class Logger(Callback):
 
 class TensorboardLogger(Callback):
     """
-    Tensorboard logger. Uses tags to group same metrics, but for
-    train and validation. Can log per-batch or per-epoch values.
-    You can maintain two independent metric sets by creating two instances
+    Logger callback, translates state.*_metrics to tensorboard
     """
 
-    def __init__(
-        self,
-        logdir: str = None,
-        metric_names: List[str] = None,
-        log_on_batch_end=True,
-        log_on_epoch_end=True,
-        split_by_loader=True
-    ):
+    def __init__(self, logdir: str = None):
         """
-        :param logdir: directory where logs will be created
-        :param metric_names: List of metric names to log.
-            If none - logs everything.
-        :param log_on_batch_end: Logs per-batch value of metrics,
-            prepends 'batch_' prefix to their names.
-        :param log_on_epoch_end: Logs per-epoch metrics if set True
-        :param split_by_loader:
-            Uses separate writer in separate subdir per loader
-            (will be visible as two different runs in TB)
+        :param logdir: log directory to use for tf logging
         """
-
         self.logdir = logdir
-        self.metrics_to_log = metric_names
-        self.split_by_loader = split_by_loader
-        self.log_on_batch_end = log_on_batch_end
-        self.log_on_epoch_end = log_on_epoch_end
+        self.loggers = dict()
 
-        # You definitely should log something)
-        assert self.log_on_batch_end or self.log_on_epoch_end
+    def on_loader_start(self, state):
+        lm = state.loader_mode
+        if lm not in self.loggers:
+            self.loggers[lm] = UtilsFactory.create_tflogger(
+                logdir=self.logdir, name=lm)
 
-        self.writers = {}
+    def on_batch_end(self, state):
+        lm = state.loader_mode
+        for key, value in state.batch_metrics.items():
+            self.loggers[lm].add_scalar(key, value, state.step)
 
-    @property
-    def _writer_suffix(self):
-        suffix = "_"
+    def on_loader_end(self, state):
+        lm = state.loader_mode
+        for key, value in state.epoch_metrics[lm].items():
+            self.loggers[lm].add_scalar(f"epoch {key}", value, state.epoch)
 
-        if self.log_on_batch_end:
-            suffix += "batch"
 
-        if self.log_on_epoch_end:
-            suffix += "epoch"
-        return suffix
-
-    def _get_writer(self, mode):
-        if not self.split_by_loader:
-            mode = ""
-
-        if mode not in self.writers:
-            # suffix prevents conflict between instances
-            self.writers[mode] = SummaryWriter(
-                os.path.join(self.logdir, mode),
-                filename_suffix=self._writer_suffix
-            )
-
-        return self.writers[mode]
-
-    def _log_metrics(
-        self,
-        metrics: Dict[str, float],
-        mode: str,
-        step: int,
-        prefix=""
-    ):
-        if self.metrics_to_log is None:
-            self.metrics_to_log = list(metrics.keys())
-
-        for name in self.metrics_to_log:
-            if name in metrics:
-                self._get_writer(mode) \
-                    .add_scalar(f"{prefix}{name}/{mode}", metrics[name], step)
-
-    def on_loader_end(self, state: RunnerState):
-        if self.log_on_epoch_end:
-            mode = state.loader_mode
-            self._log_metrics(state.epoch_metrics[mode], mode, state.epoch)
-
-        # for wrt in self.writers.values():
-        #     wrt.file_writer.flush()
-
-    def on_batch_end(self, state: RunnerState):
-        if self.log_on_batch_end:
-            mode = state.loader_mode
-            self._log_metrics(state.batch_metrics, mode, state.step, "batch_")
+# class TensorboardLogger(Callback):
+#     """
+#     Tensorboard logger. Uses tags to group same metrics, but for
+#     train and validation. Can log per-batch or per-epoch values.
+#     You can maintain two independent metric sets by creating two instances
+#     """
+#
+#     def __init__(
+#         self,
+#         logdir: str = None,
+#         metric_names: List[str] = None,
+#         log_on_batch_end=True,
+#         log_on_epoch_end=True,
+#         split_by_loader=True
+#     ):
+#         """
+#         :param logdir: directory where logs will be created
+#         :param metric_names: List of metric names to log.
+#             If none - logs everything.
+#         :param log_on_batch_end: Logs per-batch value of metrics,
+#             prepends 'batch_' prefix to their names.
+#         :param log_on_epoch_end: Logs per-epoch metrics if set True
+#         :param split_by_loader:
+#             Uses separate writer in separate subdir per loader
+#             (will be visible as two different runs in TB)
+#         """
+#
+#         self.logdir = logdir
+#         self.metrics_to_log = metric_names
+#         self.split_by_loader = split_by_loader
+#         self.log_on_batch_end = log_on_batch_end
+#         self.log_on_epoch_end = log_on_epoch_end
+#
+#         # You definitely should log something)
+#         assert self.log_on_batch_end or self.log_on_epoch_end
+#
+#         self.writers = {}
+#
+#     @property
+#     def _writer_suffix(self):
+#         suffix = "_"
+#
+#         if self.log_on_batch_end:
+#             suffix += "batch"
+#
+#         if self.log_on_epoch_end:
+#             suffix += "epoch"
+#         return suffix
+#
+#     def _get_writer(self, mode):
+#         if not self.split_by_loader:
+#             mode = ""
+#
+#         if mode not in self.writers:
+#             # suffix prevents conflict between instances
+#             self.writers[mode] = SummaryWriter(
+#                 os.path.join(self.logdir, mode),
+#                 filename_suffix=self._writer_suffix
+#             )
+#
+#         return self.writers[mode]
+#
+#     def _log_metrics(
+#         self,
+#         metrics: Dict[str, float],
+#         mode: str,
+#         step: int,
+#         prefix=""
+#     ):
+#         if self.metrics_to_log is None:
+#             self.metrics_to_log = list(metrics.keys())
+#
+#         for name in self.metrics_to_log:
+#             if name in metrics:
+#                 self._get_writer(mode) \
+#                     .add_scalar(f"{prefix}{name}/{mode}", metrics[name], step)
+#
+#     def on_loader_end(self, state: RunnerState):
+#         if self.log_on_epoch_end:
+#             mode = state.loader_mode
+#             self._log_metrics(state.epoch_metrics[mode], mode, state.epoch)
+#
+#         # for wrt in self.writers.values():
+#         #     wrt.file_writer.flush()
+#
+#     def on_batch_end(self, state: RunnerState):
+#         if self.log_on_batch_end:
+#             mode = state.loader_mode
+#             self._log_metrics(state.batch_metrics, mode, state.step, "batch_")
 
 
 class CheckpointCallback(Callback):
