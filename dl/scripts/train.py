@@ -40,13 +40,13 @@ def parse_args():
 
 
 def main(args, unknown_args):
+    if args.logdir is not None and len(args.logdir) == 0:
+        args.logdir = None
+
     args, config = parse_args_uargs(args, unknown_args, dump_config=True)
     set_global_seeds(args.seed)
 
     assert args.baselogdir is not None or args.logdir is not None
-
-    if args.logdir is not None and len(args.logdir) == 0:
-        args.logdir = None
 
     if args.logdir is None:
         modules_ = prepare_modules(model_dir=args.model_dir)
