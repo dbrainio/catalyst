@@ -86,7 +86,8 @@ def parse_args_uargs(args, unknown_args, dump_config=False):
                 arg_value = value
             setattr(args_, key, arg_value)
 
-    if dump_config and getattr(args_, "logdir", None) is not None:
-        save_config(config=config, logdir=args_.logdir)
+    logdir = getattr(args_, "logdir", None)
+    if dump_config and logdir is not None:
+        save_config(config=config, logdir=logdir)
 
     return args_, config

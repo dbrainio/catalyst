@@ -45,6 +45,9 @@ def main(args, unknown_args):
 
     assert args.baselogdir is not None or args.logdir is not None
 
+    if args.logdir is not None and len(args.logdir) == 0:
+        args.logdir = None
+
     if args.logdir is None:
         modules_ = prepare_modules(model_dir=args.model_dir)
         logdir = modules_["model"].prepare_logdir(config=config)
